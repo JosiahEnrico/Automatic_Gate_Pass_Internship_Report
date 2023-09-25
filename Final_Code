@@ -1,0 +1,247 @@
+// C++ code
+#include <LiquidCrystal.h>
+
+#define echoPin1 A1 // attach pin D7 Arduino to pin Echo of HC-SR04
+#define trigPin1 8 //attach pin D6 Arduino to pin Trig of HC-SR04
+#define echoPin2 A2 // attach pin D7 Arduino to pin Echo of HC-SR04
+#define trigPin2 9 //attach pin D6 Arduino to pin Trig of HC-SR04
+#define echoPinBar A0 // attach pin D7 Arduino to pin Echo of HC-SR04
+#define trigPinBar 10 //attach pin D6 Arduino to pin Trig of HC-SR04
+
+long duration1; // variable for the duration of sound wave travel
+long duration2;
+long durationBar;
+int distance1; // variable for the distance measurement (cm)
+int distance2;
+int distanceBar;
+int delayms = 200;
+int dis = 10;
+
+//For Servo, button and LCD
+#include <LiquidCrystal.h>
+LiquidCrystal lcd_1(12, 11, 5, 4, 3, 2);
+
+#include <Servo.h>
+int pos = 0;
+Servo servo1;
+#define servoPin 7
+
+const int mybutton = 13;
+int button = 0;
+int buttonLast = 0;
+
+//For algorithm
+int wheel = 0;
+boolean openCheck = false;
+boolean overrideCheck = false;
+boolean wheelCheck = false;
+boolean act = false;
+int count = 0;
+String mode;
+
+
+void setup()
+{
+  lcd_1.begin(16, 2); // Set up the number of columns and rows on the LCD.
+  Serial.begin(9600); // // Serial Communication is starting with 9600 of baudrate speed
+  mode = "Auto";
+  
+  pinMode(trigPin1, OUTPUT); // Sets the trigPin as an OUTPUT
+  pinMode(echoPin1, INPUT); // Sets the echoPin as an INPUT
+  pinMode(trigPin2, OUTPUT); // Sets the trigPin as an OUTPUT
+  pinMode(echoPin2, INPUT); // Sets the echoPin as an INPUT
+  pinMode(trigPinBar, OUTPUT); // Sets the trigPin as an OUTPUT
+  pinMode(echoPinBar, INPUT); // Sets the echoPin as an INPUT
+  
+  servo1.attach(servoPin, 500, 2500);
+  servo1.write(pos);
+  pinMode(mybutton,INPUT);
+  // Print a message to the LCD.
+  Serial.println("Test with Arduino UNO R3");
+  lcd_1.print("Test Start");
+  delay(1000);
+}
+
+void loop()
+{
+  button = digitalRead(mybutton);
+  lcd_1.clear();
+  lcd_1.setCursor(0, 0);
+  lcd_1.print(mode);
+  
+/*
+ALGORITHM FOR ULTRASONIC READING
+*/
+  // Clears the trigPin condition
+  digitalWrite(trigPin1, LOW);
+  delayMicroseconds(2);
+  // Sets the trigPin HIGH (ACTIVE) for 10 microseconds
+  digitalWrite(trigPin1, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin1, LOW);
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration1 = pulseIn(echoPin1, HIGH);
+  // Calculating the distance
+  distance1 = duration1 * 0.034 / 2;
+  
+  // Clears the trigPin condition
+  digitalWrite(trigPin2, LOW);
+  delayMicroseconds(2);
+  // Sets the trigPin HIGH (ACTIVE) for 10 microseconds
+  digitalWrite(trigPin2, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin2, LOW);
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration2 = pulseIn(echoPin2, HIGH);
+  // Calculating the distance
+  distance2 = duration2 * 0.034 / 2;
+  
+  // Clears the trigPin condition
+  digitalWrite(trigPinBar, LOW);
+  delayMicroseconds(2);
+  // Sets the trigPin HIGH (ACTIVE) for 10 microseconds
+  digitalWrite(trigPinBar, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPinBar, LOW);
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  durationBar = pulseIn(echoPinBar, HIGH);
+  // Calculating the distance
+  distanceBar = durationBar * 0.034 / 2;
+
+/*
+ALGORITHM FOR MONITORING
+*/
+
+  // Displays the distance on the Serial Monitor
+  Serial.print("D1: ");
+  Serial.print(distance1);
+  Serial.print(" cm, ");
+  Serial.print("D2: ");
+  Serial.print(distance2);
+  Serial.print(" cm, ");
+  Serial.print("DBar: ");
+  Serial.print(distanceBar);
+  Serial.print(" cm ");
+  Serial.print("Wh: ");
+  Serial.print(wheel);
+  Serial.print(" Pos: ");
+  Serial.print(pos);
+  Serial.print(" opCheck: ");
+  Serial.print(openCheck);
+  Serial.print(" ovrdCheck: ");
+  Serial.print(overrideCheck);
+  Serial.print(" count: ");
+  Serial.print(count);
+  Serial.print(" bttn: ");
+  Serial.println(button);
+  
+/*
+ALGORITHM FOR MODE SWITCHING
+*/
+  //Override switch by holding the button more than 3 seconds
+  if (button == HIGH){
+    count = count + 1;
+  } else {
+    if (count > 3000/delayms && overrideCheck == false){
+      overrideCheck = true;
+      count = 0;
+    }
+    
+    if (count > 3000/delayms && overrideCheck == true){
+      overrideCheck = false;
+      count = 0;
+    }
+    count = 0;
+  }
+  
+  //Override mode
+  switch(overrideCheck){
+  case true:
+    mode = "Manual";
+    manual();
+  	break;
+
+  case false:
+    mode = "Auto";
+  	normal();
+  	break;
+  }
+  
+  servo1.write(pos);
+  delay(200);
+}
+
+/*
+ALGORITHM FOR MANUAL GATE CONTROL
+*/
+void manual(){
+  
+  if(button == LOW && buttonLast == HIGH && act == true && pos == 0){
+    pos = 90;
+    act = false;
+  }
+  if(button == LOW && buttonLast == HIGH && act == true && pos == 90){
+    pos = 0;
+    act = false;
+  }
+  
+  lcd_1.setCursor(0, 1);
+  if (pos == 90){
+    lcd_1.print("Press to Close");
+  }
+  if (pos == 0){
+    lcd_1.print("Press to Open");
+  }
+  act = true;
+  buttonLast = button;
+}
+
+/*
+ALGORITHM FOR AUTOMATIC GATE CONTROL
+*/
+void normal(){
+  lcd_1.print(" Wh: ");
+  lcd_1.print(wheel*2);
+  lcd_1.setCursor(0, 1);
+  
+  if(pos == 0){
+    if(distance1 <= dis){
+    //Vehicle in
+      if(distance2 <= dis){
+        wheelCheck = true;
+      }
+      
+      if(distance2 >= dis && wheelCheck == true && wheel <= 6){
+        wheel += 1;
+        wheelCheck = false;
+      }
+    } else {
+    
+    //Vehicle out
+      if(wheelCheck == true){
+        wheelCheck = false;
+        wheel += 1;
+      }
+      if(pos == 0 && wheel >= 2){
+        lcd_1.print("Press to Open");
+        if(button == HIGH){   
+          pos = 90;
+        }
+      } 
+    }
+  }
+    
+  if(pos == 90){
+    lcd_1.print("Pass to Close");
+    if (distanceBar <= dis){
+      openCheck = true;
+    }
+
+    if(openCheck == true && distanceBar >= dis){
+      delay(1000);
+      pos = 0;
+      openCheck = false;
+      wheel = 0;
+    }
+  }
+}
